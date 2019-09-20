@@ -367,6 +367,42 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		}
 	}
 
+	a.initWithDefaults(config)
+
+	// Make sure the buffer doesn't grow indefinitely.
+	// NOTE: We actually won't get anywhere close to this limit.
+	// SRTP will constantly read from the endpoint and drop packets if it's full.
+	a.buffer.SetLimitSize(maxBufferSize)
+
+	if a.lite && (len(a.candidateTypes) != 1 || a.candidateTypes[0] != CandidateTypeHost) {
+		return nil, ErrLiteUsingNonHostCandidates
+	}
+
+	if config.Urls != nil && len(config.Urls) > 0 && !containsCandidateType(CandidateTypeServerReflexive, a.candidateTypes) && !containsCandidateType(CandidateTypeRelay, a.candidateTypes) {
+		return nil, ErrUselessUrlsProvided
+	}
+
+	// MulticastDNSModeQueryAndGather wins (over 1:1 NAT Host)
+	a.extIPMapper, err = newExternalIPMapper(config.NAT1To1IPCandidateType, config.NAT1To1IPs)
+	if err != nil {
+		return nil, err
+	}
+	if a.mDNSMode == MulticastDNSModeQueryAndGather && a.extIPMapper != nil &&
+		a.extIPMapper.candidateType == CandidateTypeHost {
+		return nil, ErrMulticastDNSWithNAT1To1IPMapping
+	}
+
+	go a.taskLoop()
+
+	// Initialize local candidates
+	if !a.trickle {
+		a.gatherCandidates()
+	}
+	return a, nil
+}
+
+// a sSeparate init routine called by NewAgent() to overcome gocyclo error with golangci-lint
+func (a *Agent) initWithDefaults(config *AgentConfig) {
 	if config.MaxBindingRequests == nil {
 		a.maxBindingRequests = defaultMaxBindingRequests
 	} else {
@@ -403,11 +439,6 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		a.relayAcceptanceMinWait = *config.RelayAcceptanceMinWait
 	}
 
-	// Make sure the buffer doesn't grow indefinitely.
-	// NOTE: We actually won't get anywhere close to this limit.
-	// SRTP will constantly read from the endpoint and drop packets if it's full.
-	a.buffer.SetLimitSize(maxBufferSize)
-
 	// connectionTimeout used to declare a connection dead
 	if config.ConnectionTimeout == nil {
 		a.connectionTimeout = defaultConnectionTimeout
@@ -432,32 +463,6 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 	} else {
 		a.candidateTypes = config.CandidateTypes
 	}
-
-	if a.lite && (len(a.candidateTypes) != 1 || a.candidateTypes[0] != CandidateTypeHost) {
-		return nil, ErrLiteUsingNonHostCandidates
-	}
-
-	if config.Urls != nil && len(config.Urls) > 0 && !containsCandidateType(CandidateTypeServerReflexive, a.candidateTypes) && !containsCandidateType(CandidateTypeRelay, a.candidateTypes) {
-		return nil, ErrUselessUrlsProvided
-	}
-
-	// MulticastDNSModeQueryAndGather wins (over 1:1 NAT Host)
-	a.extIPMapper, err = newExternalIPMapper(config.NAT1To1IPCandidateType, config.NAT1To1IPs)
-	if err != nil {
-		return nil, err
-	}
-	if a.mDNSMode == MulticastDNSModeQueryAndGather && a.extIPMapper != nil &&
-		a.extIPMapper.candidateType == CandidateTypeHost {
-		return nil, ErrMulticastDNSWithNAT1To1IPMapping
-	}
-
-	go a.taskLoop()
-
-	// Initialize local candidates
-	if !a.trickle {
-		a.gatherCandidates()
-	}
-	return a, nil
 }
 
 // OnConnectionStateChange sets a handler that is fired when the connection state changes

@@ -21,11 +21,8 @@ type externalIPMapper struct {
 	candidateType      CandidateType
 }
 
-func newExternalIPMapper(typ CandidateType, ips []string) (*externalIPMapper, error) {
-	candidateType := typ
-
+func newExternalIPMapper(candidateType CandidateType, ips []string) (*externalIPMapper, error) {
 	if len(ips) == 0 {
-		candidateType = CandidateTypeUnspecified
 		return nil, nil
 	}
 	if candidateType == CandidateTypeUnspecified {
