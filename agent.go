@@ -83,9 +83,10 @@ type Agent struct {
 	// force candidate to be contacted immediately (instead of waiting for connectivityTicker)
 	forceCandidateContact chan bool
 
-	trickle         bool
-	tieBreaker      uint64
-	lite            bool
+	trickle    bool
+	tieBreaker uint64
+	lite       bool
+
 	connectionState ConnectionState
 	gatheringState  GatheringState
 
@@ -141,6 +142,9 @@ type Agent struct {
 
 	// LRU of outbound Binding request Transaction IDs
 	pendingBindingRequests []bindingRequest
+
+	// 1:1 D-NAT IP address mapping
+	extIPMapper *externalIPMapper
 
 	// State for closing
 	done chan struct{}
@@ -221,6 +225,20 @@ type AgentConfig struct {
 
 	// Lite agents do not perform connectivity check and only provide host candidates.
 	Lite bool
+
+	// NAT1To1IPCandidateType is used along with NAT1To1IPs to specify which candidate type
+	// the 1:1 NAT IP addresses should be mapped to.
+	// If unspecified or CandidateTypeHost, NAT1To1IPs are used to replace host candidate IPs.
+	// If CandidateTypeServerReflexive, it will insert a srflx candidate (as if it was dervied
+	// from a STUN server) with its port number being the one for the actual host candidate.
+	// Other values will result in an error.
+	NAT1To1IPCandidateType CandidateType
+
+	// NAT1To1IPs contains a list of public IP addresses that are to be used as a host
+	// candidate or srflx candidate. This is used typically for servers that are behind
+	// 1:1 D-NAT (e.g. AWS EC2 instances) and to eliminate the need of server reflexisive
+	// candidate gathering.
+	NAT1To1IPs []string
 
 	// HostAcceptanceMinWait specify a minimum wait time before selecting host candidates
 	HostAcceptanceMinWait *time.Duration
@@ -421,6 +439,16 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 
 	if config.Urls != nil && len(config.Urls) > 0 && !containsCandidateType(CandidateTypeServerReflexive, a.candidateTypes) && !containsCandidateType(CandidateTypeRelay, a.candidateTypes) {
 		return nil, ErrUselessUrlsProvided
+	}
+
+	// MulticastDNSModeQueryAndGather wins (over 1:1 NAT Host)
+	a.extIPMapper, err = newExternalIPMapper(config.NAT1To1IPCandidateType, config.NAT1To1IPs)
+	if err != nil {
+		return nil, err
+	}
+	if a.mDNSMode == MulticastDNSModeQueryAndGather && a.extIPMapper != nil &&
+		a.extIPMapper.candidateType == CandidateTypeHost {
+		return nil, ErrMulticastDNSWithNAT1To1IPMapping
 	}
 
 	go a.taskLoop()
