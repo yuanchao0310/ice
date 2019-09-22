@@ -360,7 +360,7 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 
 	if a.net == nil {
 		a.net = vnet.NewNet(nil)
-	} else {
+	} else if a.net.IsVirtual() {
 		a.log.Warn("vnet is enabled")
 		if a.mDNSMode != MulticastDNSModeDisabled {
 			a.log.Warn("vnet does not support mDNS yet")
