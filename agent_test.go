@@ -367,10 +367,11 @@ func TestConnectivityOnStartup(t *testing.T) {
 		Proto:  ProtoTypeUDP,
 	}
 
-	v, err := buildVNet(&vnet.NATType{
+	natType := &vnet.NATType{
 		MappingBehavior:   vnet.EndpointIndependent,
 		FilteringBehavior: vnet.EndpointIndependent,
-	})
+	}
+	v, err := buildVNet(natType, natType)
 	require.NoError(t, err, "should succeed")
 	defer v.close()
 
@@ -440,10 +441,11 @@ func TestConnectivityLite(t *testing.T) {
 		Proto:  ProtoTypeUDP,
 	}
 
-	v, err := buildVNet(&vnet.NATType{
+	natType := &vnet.NATType{
 		MappingBehavior:   vnet.EndpointIndependent,
 		FilteringBehavior: vnet.EndpointIndependent,
-	})
+	}
+	v, err := buildVNet(natType, natType)
 	require.NoError(t, err, "should succeed")
 	defer v.close()
 
