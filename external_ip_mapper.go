@@ -13,12 +13,53 @@ func validateIPString(ipStr string) (net.IP, bool, error) {
 	return ip, (ip.To4() != nil), nil
 }
 
+type mappings struct {
+	mapAllIP net.IP
+	ipMap    map[string]net.IP
+}
+
+func (m *mappings) setMapAllIP(ip net.IP) error {
+	if m.mapAllIP != nil || len(m.ipMap) > 0 {
+		return ErrInvalidNAT1To1IPMapping
+	}
+
+	m.mapAllIP = ip
+
+	return nil
+}
+
+func (m *mappings) addIPMapping(src string, dest net.IP) error {
+	if m.mapAllIP != nil {
+		return ErrInvalidNAT1To1IPMapping
+	}
+
+	// check if dup of local IP
+	if _, ok := m.ipMap[src]; ok {
+		return ErrInvalidNAT1To1IPMapping
+	}
+
+	m.ipMap[src] = dest
+
+	return nil
+}
+
+func (m *mappings) findExternalIP(localIPStr string) (net.IP, error) {
+	if m.mapAllIP != nil {
+		return m.mapAllIP, nil
+	}
+
+	extIP, ok := m.ipMap[localIPStr]
+	if !ok {
+		return nil, ErrExternalMappedIPNotFound
+	}
+
+	return extIP, nil
+}
+
 type externalIPMapper struct {
-	ipv4Map            map[string]net.IP
-	ipv6Map            map[string]net.IP
-	isLocIPv4Specified bool // if true, ipv4Map has 0 or 1 external IPv4
-	isLocIPv6Specified bool // if true, ipv6Map has 0 or 1 external IPv6
-	candidateType      CandidateType
+	ipv4Mappings  mappings
+	ipv6Mappings  mappings
+	candidateType CandidateType
 }
 
 func newExternalIPMapper(candidateType CandidateType, ips []string) (*externalIPMapper, error) {
@@ -32,8 +73,8 @@ func newExternalIPMapper(candidateType CandidateType, ips []string) (*externalIP
 	}
 
 	m := &externalIPMapper{
-		ipv4Map:       map[string]net.IP{},
-		ipv6Map:       map[string]net.IP{},
+		ipv4Mappings:  mappings{ipMap: map[string]net.IP{}},
+		ipv6Mappings:  mappings{ipMap: map[string]net.IP{}},
 		candidateType: candidateType,
 	}
 
@@ -49,15 +90,13 @@ func newExternalIPMapper(candidateType CandidateType, ips []string) (*externalIP
 		}
 		if len(ipPair) == 1 {
 			if isExtIPv4 {
-				if m.isLocIPv4Specified || len(m.ipv4Map) > 0 {
-					return nil, ErrInvalidNAT1To1IPMapping
+				if err := m.ipv4Mappings.setMapAllIP(extIP); err != nil {
+					return nil, err
 				}
-				m.ipv4Map["*"] = extIP
 			} else {
-				if m.isLocIPv6Specified || len(m.ipv6Map) > 0 {
-					return nil, ErrInvalidNAT1To1IPMapping
+				if err := m.ipv6Mappings.setMapAllIP(extIP); err != nil {
+					return nil, err
 				}
-				m.ipv6Map["*"] = extIP
 			}
 		} else {
 			locIP, isLocIPv4, err := validateIPString(ipPair[1])
@@ -68,28 +107,18 @@ func newExternalIPMapper(candidateType CandidateType, ips []string) (*externalIP
 				if !isLocIPv4 {
 					return nil, ErrInvalidNAT1To1IPMapping
 				}
-				if len(m.ipv4Map) > 0 && !m.isLocIPv4Specified {
-					return nil, ErrInvalidNAT1To1IPMapping
+
+				if err := m.ipv4Mappings.addIPMapping(locIP.String(), extIP); err != nil {
+					return nil, err
 				}
-				// check if dup of local IP
-				if _, ok := m.ipv4Map[locIP.String()]; ok {
-					return nil, ErrInvalidNAT1To1IPMapping
-				}
-				m.isLocIPv4Specified = true
-				m.ipv4Map[locIP.String()] = extIP
 			} else {
 				if isLocIPv4 {
 					return nil, ErrInvalidNAT1To1IPMapping
 				}
-				if len(m.ipv6Map) > 0 && !m.isLocIPv6Specified {
-					return nil, ErrInvalidNAT1To1IPMapping
+
+				if err := m.ipv6Mappings.addIPMapping(locIP.String(), extIP); err != nil {
+					return nil, err
 				}
-				// check if dup of local IP
-				if _, ok := m.ipv6Map[locIP.String()]; ok {
-					return nil, ErrInvalidNAT1To1IPMapping
-				}
-				m.isLocIPv6Specified = true
-				m.ipv6Map[locIP.String()] = extIP
 			}
 		}
 	}
@@ -104,32 +133,8 @@ func (m *externalIPMapper) findExternalIP(localIPStr string) (net.IP, error) {
 	}
 
 	if isLocIPv4 {
-		if m.isLocIPv4Specified {
-			extIP, ok := m.ipv4Map[locIP.String()]
-			if !ok {
-				return nil, ErrExternalMappedIPNotFound
-			}
-			return extIP, nil
-		}
-
-		extIP, ok := m.ipv4Map["*"]
-		if !ok {
-			return nil, ErrExternalMappedIPNotFound
-		}
-		return extIP, nil
+		return m.ipv4Mappings.findExternalIP(locIP.String())
 	}
 
-	if m.isLocIPv6Specified {
-		extIP, ok := m.ipv6Map[locIP.String()]
-		if !ok {
-			return nil, ErrExternalMappedIPNotFound
-		}
-		return extIP, nil
-	}
-
-	extIP, ok := m.ipv6Map["*"]
-	if !ok {
-		return nil, ErrExternalMappedIPNotFound
-	}
-	return extIP, nil
+	return m.ipv6Mappings.findExternalIP(locIP.String())
 }

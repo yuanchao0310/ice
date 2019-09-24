@@ -48,10 +48,10 @@ func TestExternalIPMapper(t *testing.T) {
 		assert.NoError(t, err, "should succeed")
 		assert.NotNil(t, m, "should not be nil")
 		assert.Equal(t, CandidateTypeHost, m.candidateType, "should match")
-		assert.False(t, m.isLocIPv4Specified, "should be false")
-		assert.False(t, m.isLocIPv6Specified, "should be false")
-		assert.Equal(t, 1, len(m.ipv4Map), "should match")
-		assert.Equal(t, 0, len(m.ipv6Map), "should match")
+		assert.NotNil(t, m.ipv4Mappings.mapAllIP)
+		assert.Nil(t, m.ipv6Mappings.mapAllIP)
+		assert.Equal(t, 0, len(m.ipv4Mappings.ipMap), "should match")
+		assert.Equal(t, 0, len(m.ipv6Mappings.ipMap), "should match")
 
 		// IPv4 with no explicit local IP, using CandidateTypeServerReflexive
 		m, err = newExternalIPMapper(CandidateTypeServerReflexive, []string{
@@ -60,10 +60,10 @@ func TestExternalIPMapper(t *testing.T) {
 		assert.NoError(t, err, "should succeed")
 		assert.NotNil(t, m, "should not be nil")
 		assert.Equal(t, CandidateTypeServerReflexive, m.candidateType, "should match")
-		assert.False(t, m.isLocIPv4Specified, "should be false")
-		assert.False(t, m.isLocIPv6Specified, "should be false")
-		assert.Equal(t, 1, len(m.ipv4Map), "should match")
-		assert.Equal(t, 0, len(m.ipv6Map), "should match")
+		assert.NotNil(t, m.ipv4Mappings.mapAllIP)
+		assert.Nil(t, m.ipv6Mappings.mapAllIP)
+		assert.Equal(t, 0, len(m.ipv4Mappings.ipMap), "should match")
+		assert.Equal(t, 0, len(m.ipv6Mappings.ipMap), "should match")
 
 		// IPv4 with no explicit local IP, defaults to CandidateTypeHost
 		m, err = newExternalIPMapper(CandidateTypeUnspecified, []string{
@@ -72,10 +72,10 @@ func TestExternalIPMapper(t *testing.T) {
 		assert.NoError(t, err, "should succeed")
 		assert.NotNil(t, m, "should not be nil")
 		assert.Equal(t, CandidateTypeHost, m.candidateType, "should match")
-		assert.False(t, m.isLocIPv4Specified, "should be false")
-		assert.False(t, m.isLocIPv6Specified, "should be false")
-		assert.Equal(t, 0, len(m.ipv4Map), "should match")
-		assert.Equal(t, 1, len(m.ipv6Map), "should match")
+		assert.Nil(t, m.ipv4Mappings.mapAllIP)
+		assert.NotNil(t, m.ipv6Mappings.mapAllIP)
+		assert.Equal(t, 0, len(m.ipv4Mappings.ipMap), "should match")
+		assert.Equal(t, 0, len(m.ipv6Mappings.ipMap), "should match")
 
 		// IPv4 and IPv6 in the mix
 		m, err = newExternalIPMapper(CandidateTypeUnspecified, []string{
@@ -85,10 +85,10 @@ func TestExternalIPMapper(t *testing.T) {
 		assert.NoError(t, err, "should succeed")
 		assert.NotNil(t, m, "should not be nil")
 		assert.Equal(t, CandidateTypeHost, m.candidateType, "should match")
-		assert.False(t, m.isLocIPv4Specified, "should be false")
-		assert.False(t, m.isLocIPv6Specified, "should be false")
-		assert.Equal(t, 1, len(m.ipv4Map), "should match")
-		assert.Equal(t, 1, len(m.ipv6Map), "should match")
+		assert.NotNil(t, m.ipv4Mappings.mapAllIP)
+		assert.NotNil(t, m.ipv6Mappings.mapAllIP)
+		assert.Equal(t, 0, len(m.ipv4Mappings.ipMap), "should match")
+		assert.Equal(t, 0, len(m.ipv6Mappings.ipMap), "should match")
 
 		// Unsupported candidate type - CandidateTypePeerReflexive
 		m, err = newExternalIPMapper(CandidateTypePeerReflexive, []string{
@@ -146,10 +146,10 @@ func TestExternalIPMapper(t *testing.T) {
 		assert.NoError(t, err, "should succeed")
 		assert.NotNil(t, m, "should not be nil")
 		assert.Equal(t, CandidateTypeHost, m.candidateType, "should match")
-		assert.True(t, m.isLocIPv4Specified, "should be true")
-		assert.False(t, m.isLocIPv6Specified, "should be false")
-		assert.Equal(t, 1, len(m.ipv4Map), "should match")
-		assert.Equal(t, 0, len(m.ipv6Map), "should match")
+		assert.Nil(t, m.ipv4Mappings.mapAllIP)
+		assert.Nil(t, m.ipv6Mappings.mapAllIP)
+		assert.Equal(t, 1, len(m.ipv4Mappings.ipMap), "should match")
+		assert.Equal(t, 0, len(m.ipv6Mappings.ipMap), "should match")
 
 		// Cannot assign two ext IPs for one local IPv4
 		m, err = newExternalIPMapper(CandidateTypeUnspecified, []string{
@@ -217,8 +217,8 @@ func TestExternalIPMapper(t *testing.T) {
 		})
 		assert.NoError(t, err, "should succeed")
 		assert.NotNil(t, m, "should not be nil")
-		assert.False(t, m.isLocIPv4Specified, "should false")
-		assert.False(t, m.isLocIPv6Specified, "should false")
+		assert.NotNil(t, m.ipv4Mappings.mapAllIP)
+		assert.NotNil(t, m.ipv6Mappings.mapAllIP)
 
 		// find external IPv4
 		extIP, err = m.findExternalIP("10.0.0.1")
