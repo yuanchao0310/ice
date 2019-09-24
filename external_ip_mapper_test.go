@@ -189,6 +189,22 @@ func TestExternalIPMapper(t *testing.T) {
 		assert.Nil(t, m, "should be nil")
 	})
 
+	t.Run("newExternalIPMapper with inplicit and explicit local IP", func(t *testing.T) {
+		// Mixing inpicit and explicit local IPs not allowed
+		_, err := newExternalIPMapper(CandidateTypeUnspecified, []string{
+			"1.2.3.4",
+			"1.2.3.5/10.0.0.1",
+		})
+		assert.Error(t, err, "should fail")
+
+		// Mixing inpicit and explicit local IPs not allowed
+		_, err = newExternalIPMapper(CandidateTypeUnspecified, []string{
+			"1.2.3.5/10.0.0.1",
+			"1.2.3.4",
+		})
+		assert.Error(t, err, "should fail")
+	})
+
 	t.Run("findExternalIP without explicit local IP", func(t *testing.T) {
 		var m *externalIPMapper
 		var err error

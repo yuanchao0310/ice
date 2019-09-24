@@ -65,17 +65,23 @@ func newExternalIPMapper(candidateType CandidateType, ips []string) (*externalIP
 				return nil, err
 			}
 			if isExtIPv4 {
-				m.isLocIPv4Specified = true
 				if !isLocIPv4 {
+					return nil, ErrInvalidNAT1To1IPMapping
+				}
+				if len(m.ipv4Map) > 0 && !m.isLocIPv4Specified {
 					return nil, ErrInvalidNAT1To1IPMapping
 				}
 				// check if dup of local IP
 				if _, ok := m.ipv4Map[locIP.String()]; ok {
 					return nil, ErrInvalidNAT1To1IPMapping
 				}
+				m.isLocIPv4Specified = true
 				m.ipv4Map[locIP.String()] = extIP
 			} else {
 				if isLocIPv4 {
+					return nil, ErrInvalidNAT1To1IPMapping
+				}
+				if len(m.ipv6Map) > 0 && !m.isLocIPv6Specified {
 					return nil, ErrInvalidNAT1To1IPMapping
 				}
 				// check if dup of local IP
