@@ -382,14 +382,8 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		return nil, ErrUselessUrlsProvided
 	}
 
-	// MulticastDNSModeQueryAndGather wins (over 1:1 NAT Host)
-	a.extIPMapper, err = newExternalIPMapper(config.NAT1To1IPCandidateType, config.NAT1To1IPs)
-	if err != nil {
+	if err = a.initExtIPMapping(config); err != nil {
 		return nil, err
-	}
-	if a.mDNSMode == MulticastDNSModeQueryAndGather && a.extIPMapper != nil &&
-		a.extIPMapper.candidateType == CandidateTypeHost {
-		return nil, ErrMulticastDNSWithNAT1To1IPMapping
 	}
 
 	go a.taskLoop()
@@ -463,6 +457,45 @@ func (a *Agent) initWithDefaults(config *AgentConfig) {
 	} else {
 		a.candidateTypes = config.CandidateTypes
 	}
+}
+
+func (a *Agent) initExtIPMapping(config *AgentConfig) error {
+	var err error
+	a.extIPMapper, err = newExternalIPMapper(config.NAT1To1IPCandidateType, config.NAT1To1IPs)
+	if err != nil {
+		return err
+	}
+	if a.extIPMapper == nil {
+		return nil // this may happen when config.NAT1To1IPs is an empty array
+	}
+	if a.extIPMapper.candidateType == CandidateTypeHost {
+		if a.mDNSMode == MulticastDNSModeQueryAndGather {
+			return ErrMulticastDNSWithNAT1To1IPMapping
+		}
+		candiHostEnabled := false
+		for _, candiType := range a.candidateTypes {
+			if candiType == CandidateTypeHost {
+				candiHostEnabled = true
+				break
+			}
+		}
+		if !candiHostEnabled {
+			return ErrIneffectiveNAT1To1IPMappingHost
+		}
+
+	} else if a.extIPMapper.candidateType == CandidateTypeServerReflexive {
+		candiSrflxEnabled := false
+		for _, candiType := range a.candidateTypes {
+			if candiType == CandidateTypeServerReflexive {
+				candiSrflxEnabled = true
+				break
+			}
+		}
+		if !candiSrflxEnabled {
+			return ErrIneffectiveNAT1To1IPMappingSrflx
+		}
+	}
+	return nil
 }
 
 // OnConnectionStateChange sets a handler that is fired when the connection state changes

@@ -78,4 +78,12 @@ var (
 	// ErrMulticastDNSWithNAT1To1IPMapping indicates that the mDNS gathering cannot be used along
 	// with 1:1 NAT IP mapping for host candidate.
 	ErrMulticastDNSWithNAT1To1IPMapping = errors.New("mDNS gathering cannot be used with 1:1 NAT IP mapping for host candidate")
+
+	// ErrIneffectiveNAT1To1IPMappingHost indicates that 1:1 NAT IP mapping for host candidate is
+	// requested, but the host candidate type is disabled.
+	ErrIneffectiveNAT1To1IPMappingHost = errors.New("1:1 NAT IP mapping for host candidate ineffective")
+
+	// ErrIneffectiveNAT1To1IPMappingSrflx indicates that 1:1 NAT IP mapping for srflx candidate is
+	// requested, but the srflx candidate type is disabled.
+	ErrIneffectiveNAT1To1IPMappingSrflx = errors.New("1:1 NAT IP mapping for srflx candidate ineffective")
 )

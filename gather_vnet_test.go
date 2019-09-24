@@ -118,6 +118,10 @@ func TestVNetGather(t *testing.T) {
 		} else if conn == nil {
 			t.Fatalf("listenUDP error with no port restriction return a nil conn")
 		}
+		err = conn.Close()
+		if err != nil {
+			t.Fatalf("failed to close conn")
+		}
 
 		_, err = a.listenUDP(4999, 5000, udp, &net.UDPAddr{IP: ip, Port: 0})
 		if err != ErrPort {
@@ -136,6 +140,10 @@ func TestVNetGather(t *testing.T) {
 			t.Fatal(err)
 		} else if port != "5000" {
 			t.Fatalf("listenUDP with port restriction of 5000 listened on incorrect port (%s)", port)
+		}
+		err = conn.Close()
+		if err != nil {
+			t.Fatalf("failed to close conn")
 		}
 	})
 }

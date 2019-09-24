@@ -1115,3 +1115,88 @@ func TestRemoteCandidateStats(t *testing.T) {
 		t.Fatalf("Error on agent.Close(): %s", err)
 	}
 }
+
+func TestInitExtIPMapping(t *testing.T) {
+	var a *Agent
+	var err error
+
+	var closeAgent = func() {
+		if a != nil {
+			if err = a.Close(); err != nil {
+				t.Fatalf("failed to close agent: %v", err)
+			}
+		}
+	}
+
+	// a.extIPMapper should be nil by default
+	a, err = NewAgent(&AgentConfig{
+		Trickle: true, // to avoid starting gathering candidates
+	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
+	if a.extIPMapper != nil {
+		t.Fatal("a.extIPMapper should be nil by default")
+	}
+	closeAgent()
+
+	// a.extIPMapper should be nil when NAT1To1IPs is a non-nil empty array
+	a, err = NewAgent(&AgentConfig{
+		NAT1To1IPs:             []string{},
+		NAT1To1IPCandidateType: CandidateTypeHost,
+		Trickle:                true, // to avoid starting gathering candidates
+	})
+	if err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
+	if a.extIPMapper != nil {
+		t.Fatal("a.extIPMapper should be nil by default")
+	}
+	closeAgent()
+
+	// NewAgent should return an error when 1:1 NAT for host candidate is enabled
+	// but the candidate type does not appear in the CandidateTypes.
+	_, err = NewAgent(&AgentConfig{
+		NAT1To1IPs:             []string{"1.2.3.4"},
+		NAT1To1IPCandidateType: CandidateTypeHost,
+		CandidateTypes:         []CandidateType{CandidateTypeRelay},
+		Trickle:                true, // to avoid starting gathering candidates
+	})
+	if err != ErrIneffectiveNAT1To1IPMappingHost {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// NewAgent should return an error when 1:1 NAT for srflx candidate is enabled
+	// but the candidate type does not appear in the CandidateTypes.
+	_, err = NewAgent(&AgentConfig{
+		NAT1To1IPs:             []string{"1.2.3.4"},
+		NAT1To1IPCandidateType: CandidateTypeServerReflexive,
+		CandidateTypes:         []CandidateType{CandidateTypeRelay},
+		Trickle:                true, // to avoid starting gathering candidates
+	})
+	if err != ErrIneffectiveNAT1To1IPMappingSrflx {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// NewAgent should return an error when 1:1 NAT for host candidate is enabled
+	// along with mDNS with MulticastDNSModeQueryAndGather
+	_, err = NewAgent(&AgentConfig{
+		NAT1To1IPs:             []string{"1.2.3.4"},
+		NAT1To1IPCandidateType: CandidateTypeHost,
+		MulticastDNSMode:       MulticastDNSModeQueryAndGather,
+		Trickle:                true, // to avoid starting gathering candidates
+	})
+	if err != ErrMulticastDNSWithNAT1To1IPMapping {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// NewAgent should return if newExternalIPMapper() returns an error.
+	_, err = NewAgent(&AgentConfig{
+		NAT1To1IPs:             []string{"bad.2.3.4"}, // bad IP
+		NAT1To1IPCandidateType: CandidateTypeHost,
+		Trickle:                true, // to avoid starting gathering candidates
+	})
+	if err != ErrInvalidNAT1To1IPMapping {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
